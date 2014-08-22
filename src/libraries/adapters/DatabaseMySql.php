@@ -390,12 +390,12 @@ class DatabaseMySql implements DatabaseInterface
     if(!empty($email) && ($this->owner === $email || $this->getActor() === $email))
     {
       $albums = $this->db->all("SELECT * FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner ORDER BY `name` LIMIT {$offset}, {$limit}", array(':owner' => $this->owner));
-      $albumsCount = $this->db->one("SELECT COUNT(*) FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner ORDER BY `name`", array(':owner' => $this->owner));
+      $albumsCount = $this->db->one("SELECT COUNT(*) FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner", array(':owner' => $this->owner));
     }
     else
     {
       $albums = $this->db->all("SELECT * FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner AND `countPublic`>0 ORDER BY `name` LIMIT {$offset}, {$limit}", array(':owner' => $this->owner));
-      $albumsCount = $this->db->one("SELECT COUNT(*) FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner AND `countPublic`>0 ORDER BY `name` LIMIT {$offset}, {$limit}", array(':owner' => $this->owner));
+      $albumsCount = $this->db->one("SELECT COUNT(*) FROM `{$this->mySqlTablePrefix}album` WHERE `owner`=:owner AND `countPublic`>0 LIMIT {$offset}, {$limit}", array(':owner' => $this->owner));
     }
 
     if($albums === false)
