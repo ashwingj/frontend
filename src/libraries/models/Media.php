@@ -54,17 +54,14 @@ abstract class Media extends BaseModel
     $attributes = $this->setDateAttributes($attributes);
     $attributes = $this->setTagAttributes($attributes);
 
-    // check if the underlying file system needs to include any meta data into the db
-    $fsExtras = $this->fs->getMetaData($localFile);
-    if(!empty($fsExtras))
-      $attributes['extraFileSystem'] = $fsExtras;
-
-    if(!isset($attributes['filenameOriginal']) || empty($attributes['filenameOriginal']))
+    if(!empty($name) && (!isset($attributes['filenameOriginal']) || empty($attributes['filenameOriginal'])))
       $attributes['filenameOriginal'] = $name;
 
     $attributes['owner'] = $this->owner;
     $attributes['actor'] = $this->getActor();
-    $attributes['size'] = intval(filesize($localFile)/1024);
+
+    if($this->isUploadedFile($localFile));
+      $attributes['size'] = intval(filesize($localFile)/1024);
 
     foreach($attributes as $key => $val)
       $attributes[$key] = $this->trim($val);
@@ -154,6 +151,9 @@ abstract class Media extends BaseModel
 
   protected function setMediaSpecificAttributes($attributes, $localFile)
   {
+    if(!$this->isUploadedFile($localFile))
+      return $attributes;
+
     $mediaType = $this->getMediaType($localFile);
     switch($mediaType)
     {
@@ -184,18 +184,45 @@ abstract class Media extends BaseModel
   protected function setTagAttributes($attributes)
   {
     $tagObj = new Tag;
-    if($this->config->photos->autoTagWithDate == 1)
+
+    $attributes = $this->setDateTagsByAttributes($attributes);
+    if(isset($attributes['tags']) && !empty($attributes['tags']))
     {
-      $dateTags = sprintf('%s,%s', date('F', $attributes['dateTaken']), date('Y', $attributes['dateTaken']));
-      // TODO see if there's a shortcut for this
-      if(!isset($attributes['tags']) || empty($attributes['tags']))
-        $attributes['tags'] = $dateTags;
-      else
-        $attributes['tags'] .= ",{$dateTags}";
+      $attributes['tags'] = $tagObj->sanitizeTagsAsString($attributes['tags']);
+      $tagsArray = (array)explode(',', $attributes['tags']);
+      sort($tagsArray);
+      $attributes['tags'] = implode(',', $tagsArray);
     }
 
+    return $attributes;
+  }
+
+  protected function setDateTagsByAttributes($attributes)
+  {
+    if($this->config->photos->autoTagWithDate != 1)
+      return $attributes;
+
+    // in (Photo|Video)::update we might change dateTaken which means we have to remove old year/month tags
     if(isset($attributes['tags']) && !empty($attributes['tags']))
-      $attributes['tags'] = $tagObj->sanitizeTagsAsString($attributes['tags']);
+    {
+      $dateNames = array('January','February','March','April','May','June','July','August','September','October','November','December');
+
+      $tagsArray = (array)explode(',', $attributes['tags']);
+      $tagsArray = array_diff($tagsArray, $dateNames);
+      foreach($tagsArray as $k => $t)
+      {
+        if(preg_match('/^(19|20|21)[0-9]{2}$/', $t))
+          unset($tagsArray[$k]);
+      }
+      $attributes['tags'] = implode(',', $tagsArray);
+    }
+
+    $dateTags = sprintf('%s,%s', date('F', $attributes['dateTaken']), date('Y', $attributes['dateTaken']));
+    // TODO see if there's a shortcut for this
+    if(!isset($attributes['tags']) || empty($attributes['tags']))
+      $attributes['tags'] = $dateTags;
+    else
+      $attributes['tags'] .= ",{$dateTags}";
 
     return $attributes;
   }
@@ -260,5 +287,18 @@ abstract class Media extends BaseModel
       }
     }
     return $returnAttrs;
+  }
+
+  protected function isUploadedFile($localFile)
+  {
+    // add a bypass for when the `photo` parameter is passed in as a URL
+    //  in this case `is_uploaded_file` will return true since we fetch and store
+    //  that file using curl
+    // we're using strstr since the file is prefixed with the temp directory
+    // we are prefixing the local file with this constant to handle this
+    // see gh-1465 for details
+    if(strstr($localFile, 'opme-via-url'))
+      return true;
+    return is_uploaded_file($localFile);
   }
 }

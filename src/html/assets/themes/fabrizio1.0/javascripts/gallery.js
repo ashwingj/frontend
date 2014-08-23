@@ -2,10 +2,6 @@
 /* http://www.techbits.de/2011/10/25/building-a-google-plus-inspired-image-gallery/ */
 var Gallery = (function($) {
 	/* ------------ PRIVATE variables ------------ */
-  // Keep track of remaining width on last row and date
-  var lastRowWidthRemaining = 0;
-  var lastDate = null;
-
   // defaults
   var configuration = {
   	'thumbnailSize':'960x180',
@@ -14,10 +10,14 @@ var Gallery = (function($) {
   	'defaultHeightValue':120
   };
 
+  // Keep track of remaining width on last row and date
+  var lastRowWidthRemaining = 0;
+  var lastDate = null;
+  var videoQueue = {};
+  var inited = false;
   var batchEmpty;
+  var currentPage = 1;
 
-  var breakOnDate;
-  
 	/* ------------ PRIVATE functions ------------ */
 
 	/** Utility function that returns a value or the defaultvalue if the value is null */
@@ -27,6 +27,41 @@ var Gallery = (function($) {
 		}
 		return value;
 	};
+
+  var init = function() {
+    if(inited)
+      return;
+
+    setStartPage();
+    inited = true;
+  };
+
+  var trackPages = function(direction) {
+    var $el = this, thisPage = $el.attr('data-waypoint-page'), pathname = location.pathname, router = op.data.store.Router;
+
+    // check if page parameter exists and remove it
+    if(TBX.util.getPathParam('page') !== null)
+      pathname = pathname.replace(/\/page-[0-9]+/, '');
+
+    pathname = pathname.replace(/\/photos/, '/photos/page-'+thisPage);
+    router.navigate(pathname, {replace: true});
+  };
+
+  var setStartPage = function() {
+    var page;
+
+    page = TBX.util.getQueryParam('page');
+    if(page !== null) {
+      currentPage = page;
+      return;
+    } 
+
+    page = TBX.util.getPathParam('page');
+    if(page !== null) {
+      currentPage = page;
+      return;
+    } 
+  };
 
   var dateSeparator = function(ts) {
     var calendarContainer = $('<div/>');
@@ -134,19 +169,6 @@ var Gallery = (function($) {
 		// Build a row of images until longer than maxwidth
 		while(items.length > 0 && len < maxwidth) {
 			var item = items[0];
-
-      // Gh-1341
-      // If beta features are enabled then separate photos by date
-      if(breakOnDate) {
-        d = new Date(item.dateTaken*1000);
-        currentDate = d.getYear()+'-'+d.getMonth()+'-'+d.getDay();
-        if(typeof(lastDate) !== 'undefined' &&  currentDate !== lastDate) {
-          lastRowWidthRemaining = 0;
-          break;
-        }
-        lastDate = currentDate;
-      }
-
 			row.push(item);
 			len += (item[photoKey][1] + marginsOfImage);
       items.shift();
@@ -188,12 +210,20 @@ var Gallery = (function($) {
 	 * to the image. 
 	 */
 	var createImageElement = function(parent, item) {
+    var d = new Date(item.dateTaken*1000);
     var pageObject = TBX.init.pages.photos;
     var qsRe = /(page|returnSizes)=[^&?]+\&?/g;
     var qs = pageObject.pageLocation.search.replace(qsRe, '');
     var pinnedClass = !batchEmpty && OP.Batch.exists(item.id) ? 'pinned' : '';
     var imageContainer = $('<div class="imageContainer photo-id-'+item.id+' '+pinnedClass+'"/>');
-		
+
+    // we need to "mark" the first element for each api response
+    //  See gh-1434
+    var isFirstItemInResponse = typeof(item.totalRows) === 'number';
+    imageContainer.attr("data-waypoint-page", currentPage);
+
+    if(isFirstItemInResponse)
+      imageContainer.addClass('first-in-response');
 
 		var pathKey = 'path' + configuration['thumbnailSize'];
 		var defaultWidthValue = configuration['defaultWidthValue'];
@@ -227,10 +257,51 @@ var Gallery = (function($) {
 		img.css("margin-top", "" + 0 + "px");
 		img.hide();
 
-		link.append(img);
-		overflow.append(link);
-		imageContainer.append(overflow);
-    
+		var overflow = $("<div/>");
+		overflow.css("width", ""+$nz(item.vwidth, defaultWidthValue)+"px");
+		overflow.css("height", ""+$nz(item[pathKey][1], defaultHeightValue)+"px");
+		overflow.css("overflow", "hidden");
+    if(typeof(item.video) !== 'undefined' && typeof(item.videoSource) !== 'undefined') {
+      overflow.addClass("video");
+      overflow.append('<div class="video-element video-element-'+item.id+' is-splash" style="height:'+configuration.thumbnailHeight+'px; background:url(\''+item[pathKey]+'\') 100%;"/>');
+      videoQueue[item.id] = {
+        id: item.id,
+        //file:'http://content.bitsontherun.com/videos/lWMJeVvV-364767.mp4',
+        file: item.videoSource,
+        image: item[pathKey],
+        width: item.vwidth,
+        title: item.name,
+        height: configuration.thumbnailHeight
+      };
+      imageContainer.append(overflow);
+    } else {
+      var link = $('<a/>');
+      link.attr('href', urlParts.pathname+qs);
+      link.attr('title', _.escape(item.title));
+      link.attr("data-id", item.id);
+      
+      var img = $("<img/>");
+      img.attr("data-id", item.id);
+      img.attr("src", item[pathKey]);
+      //img.attr('class', 'photo-view-modal-click');
+      img.attr('class', 'photoModal');
+      img.attr("alt", _.escape(item.title));
+      img.css("width", "" + $nz(item[pathKey][1], defaultWidthValue) + "px");
+      img.css("height", "" + $nz(item[pathKey][2], defaultHeightValue) + "px");
+      img.css("margin-left", "" + (item.vx ? (-item.vx) : 0) + "px");
+      img.css("margin-top", "" + 0 + "px");
+      img.hide();
+
+      link.append(img);
+      overflow.append(link);
+      imageContainer.append(overflow);
+
+      // fade in the image after load
+      img.bind("load", function () { 
+        $(this).fadeIn(400); 
+      });
+    }
+
     /**
      * Add meta information to bottom
      *
@@ -256,12 +327,7 @@ var Gallery = (function($) {
     // insert calendar icon
     var d = new Date(item.dateTakenYear, item.dateTakenMonth - 1, item.dateTakenDay);
     currentDate = d.getYear()+'-'+d.getMonth()+'-'+d.getDay();
-    if(currentDate !== lastDate) {
-      if(breakOnDate)
-        parent.append(dateSeparator(d));
-      else
-        imageContainer.append(dateSeparator(d));
-    }
+    imageContainer.append(dateSeparator(d));
     lastDate = currentDate;
 
 		parent.append(imageContainer);
@@ -292,8 +358,8 @@ var Gallery = (function($) {
 		},
 
 		showImages : function(photosContainer, realItems) {
-      if(typeof(breakOnDate) === 'undefined')
-        breakOnDate = TBX.util.enableBetaFeatures() && TBX.util.currentPage() === 'photos';
+      // initialize
+      init();
 
       // check if the batch queue is empty
       // we do this here to keep from having to call length for each photo, just for each page
@@ -319,6 +385,10 @@ var Gallery = (function($) {
           createImageElement(photosContainer, item);
 				}
 			}
+
+      // add waypoint for new page (:not() selector skips previously added elements)
+      TBX.waypoints.add($('.imageContainer.first-in-response:not(.waypoint-added)'), trackPages);
+      currentPage++;
 		}
 	}
 })(jQuery);

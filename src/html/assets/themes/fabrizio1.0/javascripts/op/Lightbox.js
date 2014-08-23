@@ -111,7 +111,9 @@
     },
     
     _path: location.pathname,
+    _pathWithQuery: location.pathname+location.search, // see Handlers.js (click.photoModal) where this gets updated per gh-1434
     _filter: location.pathname.replace('/p/', '/').replace('/photos/', '/').replace('/list', ''),
+    _query: function() { return location.search || ''; }, // gh-1421 we make this a function since location.search changes when viewing a photo 
     _visible: false,
 
     _indexOf : function(model){
@@ -139,6 +141,7 @@
     _initEvents : function(){
       this.$el.click( this._bound('onContainerClick') );
       this.$el.find('.photo').click( this._bound('nextIfImage'));
+      this.$el.find('.header .container .close-link').click( this._bound('close'));
       this.$el.find('.photo .nav .prev').click( this._bound('prev'));
       this.$el.find('.photo .nav .next').click( this._bound('next'));
       this.$el.find('.details .toggle').click( this._bound('toggleDetails'));
@@ -231,15 +234,20 @@
       this.adjustSize();
       return this;
     },
+
+    close : function(ev){
+      ev.preventDefault();
+      return this.hide();
+    },
     
     hide : function(){
       var router = op.data.store.Router, $title = $('title');
       this._releaseDocumentEvents();
       this._visible = false;
-      this.$el.fadeOut('fast');
-      // reset the title back to the "original" title of the page
+      if(this.$el)
+        this.$el.fadeOut('fast');
       $title.html($title.attr('data-original'));
-      router.navigate(this._path, {silent:true});
+      router.navigate(this._pathWithQuery, {silent:true});
       return this;
     },
     
@@ -289,12 +297,27 @@
     },
     
     loadImage : function(){
-      var c, $title = $('title');
+      var c, src = this.model.get(this.imagePathKey), $title = $('title'), next, previous, $photo;
+      previous = this.store.at(this.store.indexOf(this.model) - 1),
+      next = this.store.at(this.store.indexOf(this.model) + 1);
+
       this.$el.find('.photo img').remove();
       this.$el.addClass('loading');
-      this.$el.find('.photo')
+      $photo = this.$el.find('.photo');
+      $photo
         .width($(window).width())
         .height(($(window).height() - this.$el.find('.bd').position().top )+'px');
+      // add/remove class="first" to .photo to hide previous arrow
+      if(typeof(previous) === 'undefined')
+        $photo.addClass('first');
+      else
+        $photo.removeClass('first');
+
+      // add/remove class="last" to .photo to hide next arrow
+      if(typeof(next) === 'undefined')
+        $photo.addClass('last');
+      else
+        $photo.removeClass('last');
         
       // set the title to include the photo's title
       $title.html(TBX.format.sprintf('%s / Photo / %s / Trovebox', TBX.profiles.getOwnerUsername(), this.model.get('title') || this.model.get('filenameOriginal')));
@@ -316,7 +339,7 @@
       if( i < 0 ) i = this.store.models.length-1;
       id = this.store.models[i].get('id');
       if( !$('body').hasClass('photo-details') ){
-        router.navigate('/p/'+id+this._filter, {trigger: false});
+        router.navigate('/p/'+id+this._filter+this._query(), {trigger: false});
       }
       this.go(i);
     },
@@ -334,12 +357,13 @@
       if( i < this.store.models.length ) {
         if( !$('body').hasClass('photo-details') ){
           id = this.store.models[i].get('id');
-          router.navigate('/p/'+id+this._filter, {trigger: false});
+          router.navigate('/p/'+id+this._filter+this._query(), {trigger: false});
         }
         this.go(i);
       }
     },
 
+    // next if the image was clicked (as opposed to the arrows)
     nextIfImage : function(ev) {
       var el = ev.target;
       if(el.tagName === 'IMG') {
@@ -351,7 +375,7 @@
     viewDetailPage : function(ev) {
       ev.preventDefault();
       var id = this.model.get('id');
-      location.href = '/p/'+id+this._filter;
+      location.href = '/p/'+id+this._filter+this._query();
     },
 
     tags: function(ev) {
@@ -391,14 +415,13 @@
         arg.preventDefault();
         id = $(arg.currentTarget).attr('data-id');
       } else {
-        id = arg;
+        id = arg.replace(/[^a-z0-9].*/,''); // since adding query strings for sort we need to sanitie
       }
       
       // get the item from the store
       model = op.data.store.Photos.get(id);
         
       if( !model ) return $.error('No image in store with id '+id);
-        
       return this.update(model).show();
     }
   });

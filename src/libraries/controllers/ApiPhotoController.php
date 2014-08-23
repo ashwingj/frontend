@@ -191,7 +191,7 @@ class ApiPhotoController extends ApiBaseController
     {
       foreach($photos as $innerKey => $photo)
       {
-        $nextPrevious[$topKey][$innerKey] = $this->photo->addApiUrls($photo, $sizes);
+        $nextPrevious[$topKey][$innerKey] = $this->photo->addApiUrls($photo, $sizes, null, $filterOpts);
         if(!$this->user->isAdmin() && $this->config->site->decreaseLocationPrecision === '1')
         {
           if(isset($nextPrevious[$topKey][$innerKey]['latitude']))
@@ -295,7 +295,7 @@ class ApiPhotoController extends ApiBaseController
     // we also can't pass in $photo since it doesn't persist over iterations and removes returnSizes
     foreach($photos as $key => $photo)
     {
-      $photos[$key] = $this->photo->addApiUrls($photos[$key], $sizes, $tokenValue);
+      $photos[$key] = $this->photo->addApiUrls($photos[$key], $sizes, $tokenValue, $filterOpts);
       if(!$this->user->isAdmin() && $this->config->site->decreaseLocationPrecision === '1')
       {
         if(isset($photos[$key]['latitude']))
@@ -871,7 +871,7 @@ class ApiPhotoController extends ApiBaseController
       }
     }
 
-    $photo = $this->photo->addApiUrls($photo, $sizes, $tokenValue);
+    $photo = $this->photo->addApiUrls($photo, $sizes, $tokenValue, $options);
     if(!$this->user->isAdmin() && $this->config->site->decreaseLocationPrecision === '1')
     {
       if(isset($photo['latitude']))
@@ -1076,6 +1076,9 @@ class ApiPhotoController extends ApiBaseController
       // else we base64_decode it
       if(preg_match('#https?://#', $_POST['photo']))
       {
+        // override the local filename so we know how to manage it
+        // see gh-1465 for details
+        $localFile = tempnam($this->config->paths->temp, 'opme-via-url');
         $fp = fopen($localFile, 'w');
         $ch = curl_init($_POST['photo']);
         curl_setopt($ch, CURLOPT_FILE, $fp);

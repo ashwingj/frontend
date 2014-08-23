@@ -6,7 +6,7 @@
  * Upload, update, delete and generate, oh my!
  * @author Jaisen Mathai <jaisen@jmathai.com>
  */
-class Photo extends BaseModel
+class Photo extends Media
 {
   public function __construct($params = null)
   {
@@ -45,7 +45,7 @@ class Photo extends BaseModel
     * @param string $protocol http or https
     * @return array
     */
-  public function addApiUrls($photo, $sizes, $token=null, $protocol=null)
+  public function addApiUrls($photo, $sizes, $token=null, $filterOpts=null, $protocol=null)
   {
     if($protocol === null)
       $protocol = $this->utility->getProtocol(false);
@@ -79,7 +79,7 @@ class Photo extends BaseModel
       unset($photo['pathOriginal']);
     }
 
-    $photo['url'] = $this->getPhotoViewUrl($photo);
+    $photo['url'] = $this->getPhotoViewUrl($photo, $filterOpts);
     return $photo;
   }
 
@@ -619,7 +619,15 @@ class Photo extends BaseModel
       return $id;
 
     $tagObj = new Tag;
-    $attributes = $this->whitelistParams($attributes);
+
+    // to preserve json columns we have to do complete writes
+    $currentPhoto = $this->db->getPhoto($id);
+    unset($currentPhoto['id'], $currentPhoto['albums']);
+    $currentPhoto['tags'] = implode(',', $currentPhoto['tags']);
+    $attributes = array_merge($currentPhoto, $attributes);
+
+    $attributes = $this->prepareAttributes($attributes, null, null);
+
     if(isset($attributes['tags']) && !empty($attributes['tags']))
       $attributes['tags'] = $tagObj->sanitizeTagsAsString($attributes['tags']);
 
@@ -756,7 +764,8 @@ class Photo extends BaseModel
   }
 
   /**
-    * Uploads a new photo to the remote file system and database.
+    * Downloads a photo from a URL and stores it locally.
+    *  Used in ApiShareController to attach a photo in an email.
     *
     * @param string $url URL of the photo to store locally
     * @return mixed file pointer on success, FALSE on failure
@@ -986,9 +995,9 @@ class Photo extends BaseModel
     *
     * @return array Default values for a new photo
     */
-  private function getPhotoViewUrl($photo)
+  private function getPhotoViewUrl($photo, $filterOpts=null)
   {
-    return sprintf('%s://%s%s', $this->utility->getProtocol(false), $this->utility->getHost(false), $this->url->photoView($photo['id'], null, false));
+    return sprintf('%s://%s%s', $this->utility->getProtocol(false), $this->utility->getHost(false), $this->url->photoView($photo['id'], $filterOpts, false));
   }
 
   /**

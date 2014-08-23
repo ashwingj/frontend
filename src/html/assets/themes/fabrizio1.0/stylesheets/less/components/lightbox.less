@@ -13,7 +13,14 @@
     .container {
       position: relative;
     }
-    .detail-link {
+    .detail {
+      &.close-link {
+        padding-right: 0px;
+        width:20px;
+        text-align:center;
+        text-decoration:none;
+      }
+      padding-right: 25px;
       position: absolute;
       right: 0;
       bottom: 0;
@@ -33,11 +40,30 @@
     height: 32px;
     width: 119px;
     text-indent: -9999em;
+    @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) { 
+      background:url("@{logo2x}") 50% 50% no-repeat;
+      background-size: 119px 32px;
+    }
   }
   
   .bd {
     text-align: center;
     .photo {
+      &.video {
+        display:inline-block;
+        position:absolute;
+        top:0;
+      }
+      &.first {
+        a.prev {
+          display:none;
+        }
+      }
+      &.last {
+        a.next {
+          display:none;
+        }
+      }
       background-image: none;
       position: relative;
       display: inline-block;
@@ -49,8 +75,11 @@
         margin:auto;
       }
       .nav {
-        .opacity(0);
-        .transition(opacity .5s);
+        /* we only hide the navigation arrows on desktop. See gh-1534 */
+        @media only screen and (min-device-width : 1024px)  {
+          .opacity(0);
+          .transition(opacity .5s);
+        }
         position: absolute;
         top: 50%;
         width: 100%;
@@ -68,10 +97,10 @@
           vertical-align: middle;
           .transition(background .25s);
           font-weight: 300;
-          &:hover {
+          text-decoration:none;
+          &.next:hover, &.prev:hover {
             background: rgba(0,0,0,.7);
-            text-decoration: none;
-            color: #fff;
+            color: @lightbox_nav_arrow;
           }
         }
         .prev {
@@ -83,7 +112,19 @@
           margin-right: 10px;
         }
         &:hover {
+          .next {
+            background: rgba(0,0,0,.3);
+            color: #ccc;
+          }
+        }
+      }
+      &:hover {
+        .nav {
           .opacity(98);
+        }
+        a.next {
+          background: rgba(0,0,0,.7);
+          color: @lightbox_nav_arrow;
         }
       }
     }

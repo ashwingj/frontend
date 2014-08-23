@@ -1,5 +1,13 @@
 (function($){
-  
+  var convertDateForInput = function(ev) {
+    var $el = $(ev.currentTarget), date = $('.display-for-edit', $el).attr('data-value'), $input = $('.editable-container .date-inline-input');
+    $input.val(date);
+  };
+  var validateDateFromInput = function(value) {
+    if(phpjs.strtotime(value) === false) {
+      return 'Could not process date.';
+    }
+  };
   var CommentView = Backbone.View.extend({
     template : _.template($('#photo-comment-tmpl').html()),
     render : function(){
@@ -59,6 +67,21 @@
         name: 'title',
         title: 'Edit Photo Title',
         placement: 'bottom'
+      }
+    }
+  });
+  
+  var DateView = op.data.view.Editable.extend({
+    template : _.template($('#photo-detail-date-tmpl').html()),
+    editable    : {
+      '.date.edit' : {
+        name: 'dateTaken',
+        title: 'Edit Photo Date',
+        emptytext: 'Set a date',
+        placement: 'top',
+        inputclass: 'date-inline-input',
+        shown: convertDateForInput,
+        validate: validateDateFromInput
       }
     }
   });
@@ -161,12 +184,14 @@
     largePath : 'path870x870',
     thumbPath : 'path180x180xCR',
     _filter: null,
+    _query: location.search || '',
     
     viewMap : {
       '.comments'     :CommentsView,
       '.photo-title'  :TitleView,
       '.description'  :DescriptionView,
       '.photo-meta'   :PhotoMetaView,
+      '.photo-date'   :DateView,
       '.collapsibles' :CollapsiblesView,
       '.rights'       :RightsView
     },
@@ -377,7 +402,6 @@
     },
     
     go : function(id){
-      
       if( this.model === this.store.get(id)) return;
       
       // get the difference
@@ -400,7 +424,7 @@
       
       this.loadMore( x > c );
       this.updateModel(this.store.get(id));
-      router.navigate('/p/'+id+this._filter, {trigger: false});
+      router.navigate('/p/'+id+this._filter+location.search, {trigger: false});
     },
     
     loadMore : function( dir ){
@@ -410,7 +434,7 @@
           [this.thumbPath, this.largePath],
           function(str){ return str.replace(/^path/,''); }
         ).join(',') 
-        , apiParams = {nextprevious:'1', generate: 'true', returnSizes:sizes}
+        , apiParams = {nextprevious:'1', generate: 'true', returnSizes:sizes, sortBy:TBX.util.getQueryParam('sortBy')}
         , endpoint
         , fn = 'next';
         
