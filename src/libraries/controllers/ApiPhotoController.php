@@ -333,6 +333,12 @@ class ApiPhotoController extends ApiBaseController
 
     // this determines where to get the photo from and populates $localFile and $name
     extract($this->parsePhotoFromRequest());
+    if(!$localFile)
+    {
+      // localFile is empty, this possibly mean that upload file (max size, etc). gh-1294
+      $this->logger->warn('Error uploading file.');
+      return $this->error('Error uploading file.', false);
+    }
 
     $hash = sha1_file($localFile);
     $allowDuplicate = $this->config->site->allowDuplicate;
@@ -412,6 +418,12 @@ class ApiPhotoController extends ApiBaseController
 
     // this determines where to get the photo from and populates $localFile and $name
     extract($this->parsePhotoFromRequest());
+    if(!$localFile)
+    {
+      // localFile is empty, this possibly mean that upload file (max size, etc). gh-1294
+      $this->logger->warn('Failed to upload file as $localFile evaluated to false.');
+      return $this->error('Error uploading file.', false);
+    }
 
     // check if file type is valid
     $utility = new Utility;
@@ -419,7 +431,7 @@ class ApiPhotoController extends ApiBaseController
     {
       $this->logger->warn(sprintf('Invalid mime type for %s', $localFile));
       unlink($localFile);
-      return $this->error('Invalid mime type', false);;
+      return $this->error('Invalid mime type', false);
     }
 
     // TODO put this in a whitelist function (see replace())
@@ -524,6 +536,13 @@ class ApiPhotoController extends ApiBaseController
   public function uploadConfirm()
   {
     $params = $_POST;
+    $tokenStr = '';
+    if(!empty($params['albums']))
+      $tokenStr .= sprintf('/album-%s', $params['albums']);
+    if(!empty($params['token']))
+      $tokenStr .= sprintf('/token-%s', $params['token']);
+
+
     $params['successIds'] = $params['duplicateIds'] = array();
     if(isset($params['success']) && !empty($params['success']))
     {
@@ -547,7 +566,7 @@ class ApiPhotoController extends ApiBaseController
     unset($params['duplicateIds']);
     if(count($params['successIds']) > 0)
     {
-      $photosResp = $this->api->invoke('/photos/list.json', EpiRoute::httpGet, array('_GET' => array('pageSize' => '0', 'ids' => $params['successIds'], 'returnSizes' => $returnSizes)));
+      $photosResp = $this->api->invoke(sprintf('/photos%s/list.json', $tokenStr), EpiRoute::httpGet, array('_GET' => array('pageSize' => '0', 'ids' => $params['successIds'], 'returnSizes' => $returnSizes)));
       if($photosResp['code'] === 200 && $photosResp['result'][0]['totalRows'] > 0)
         $params['successPhotos'] = $photosResp['result'];
     }
@@ -571,6 +590,43 @@ class ApiPhotoController extends ApiBaseController
     $template = sprintf('%s/upload-confirm.php', $this->config->paths->templates);
     $body = $this->template->get($template, $params);
     return $this->success('Photos uploaded successfully', array('tpl' => $body, 'data' => $params));
+  }
+
+  public function uploadNotify($token)
+  {
+    $shareTokenObj = new ShareToken;
+    $tokenArr = $shareTokenObj->get($token);
+    if(empty($tokenArr) || $tokenArr['type'] != 'upload')
+      return $this->forbidden('No permissions with the passed in token', false);
+
+    $albumId = $tokenArr['data'];
+    $albumResp = $this->api->invoke(sprintf('/album/%s/view.json', $albumId), EpiRoute::httpGet, array('_GET' => array('token' => $token)));
+
+    if($albumResp['code'] !== 200)
+      return $this->error('Could not get album details', false);
+
+    $uploader = $count = null;
+    if(isset($_POST['uploader']))
+      $uploader = $_POST['uploader'];
+    if(isset($_POST['count']))
+      $count = $_POST['count'];
+
+    $utilityObj = new Utility;
+    $albumName = $albumResp['result']['name'];
+    $albumUrl = sprintf('%s://%s/photos/album-%s/token-%s/list??sortBy=dateUploaded,desc', $utilityObj->getProtocol(false), $utilityObj->getHost(false), $albumId, $token);
+    $tokenOwner = $tokenArr['actor'];
+
+    $emailer = new Emailer;
+    $emailer->setRecipients(array($tokenOwner));
+    if(!empty($albumName))
+      $emailer->setSubject(sprintf('Photos uploaded to %s', $albumName));
+    else
+      $emailer->setSubject('New photos were uploaded for you');
+
+    $markup = $this->theme->get('partials/upload-notify.php', array('albumId' => $albumId, 'albumName' => $albumName, 'albumUrl' => $albumUrl, 'uploader' => $uploader, 'count' => $count));
+    $emailer->setBody($markup);
+    $res = $emailer->send($markup);
+    return $this->success('Email probably sent', true);
   }
 
   /**

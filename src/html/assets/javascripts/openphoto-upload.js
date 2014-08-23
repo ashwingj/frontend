@@ -77,7 +77,7 @@ OPU = (function() {
                 }
               },
               UploadComplete: function(uploader, files) {
-                var i, file, failed = 0, total = 0;
+                var i, file, failed = 0, total = 0, token = $("form.upload input[name='token']").val();
                 for(i in files) {
                   if(files.hasOwnProperty(i)) {
                     total++;
@@ -92,7 +92,7 @@ OPU = (function() {
               UploadFile: function() {
                 var uploader = $("#uploader").pluploadQueue(),
                     form = $('form.upload'),
-                    license = $("select[name='license'] :selected", form).val(),
+                    license = $("*[name='license']", form).val(),
                     permission = $("input[name='permission']:checked", form).val(),
                     albums = $("select[name='albums']", form).val(),
                     tags = $("input[name='tags']", form).val(),

@@ -233,10 +233,12 @@
     },
     
     hide : function(){
-      var router = op.data.store.Router;
+      var router = op.data.store.Router, $title = $('title');
       this._releaseDocumentEvents();
       this._visible = false;
-      // Ashwin this.$el.fadeOut('fast');
+      this.$el.fadeOut('fast');
+      // reset the title back to the "original" title of the page
+      $title.html($title.attr('data-original'));
       router.navigate(this._path, {silent:true});
       return this;
     },
@@ -287,13 +289,16 @@
     },
     
     loadImage : function(){
-      var c;
+      var c, $title = $('title');
       this.$el.find('.photo img').remove();
       this.$el.addClass('loading');
       this.$el.find('.photo')
         .width($(window).width())
         .height(($(window).height() - this.$el.find('.bd').position().top )+'px');
         
+      // set the title to include the photo's title
+      $title.html(TBX.format.sprintf('%s / Photo / %s / Trovebox', TBX.profiles.getOwnerUsername(), this.model.get('title') || this.model.get('filenameOriginal')));
+
       if( !(c = this.cache[this.model.get('id')]) ){
         var c = this.cache[this.model.get('id')] = new Image();
         c.onload = _.bind(this._imageLoaded, this, this.model.get('id'));
@@ -337,7 +342,6 @@
 
     nextIfImage : function(ev) {
       var el = ev.target;
-      console.log(el.tagName);
       if(el.tagName === 'IMG') {
         ev.stopPropagation();
         this.next(ev);
@@ -352,7 +356,6 @@
 
     tags: function(ev) {
       var $tagsEl = $('a.tags.editable-click', this.$el);
-      $tagsEl.on('render', function() { console.log('yaya'); });
       $tagsEl.trigger('click');
       //new op.data.view.TagSearch({el: $inputEl});
     },
