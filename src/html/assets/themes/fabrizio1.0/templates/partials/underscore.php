@@ -10,7 +10,6 @@
         <li class="pull-right"><a href="#" title="Delete this photo"><i class="icon-trash photo delete edit" data-action="delete" data-ids="<%= id %>"></i></a></li>
         <li class="pull-right"><a href="#" title="Select for batch editing"><i class="icon-pushpin pin edit" data-id="<%= id %>"></i></a></li>
         <li class="pull-right album"><a href="#" title="Set as your album cover"><i class="icon-th-large album edit" data-id="<%= id %>"></i></a></li>
-        <li class="pull-right"><a href="#" title="Set as your profile photo"><i class="icon-user profile edit" data-id="<%= id %>"></i></a></li>
         <li class="pull-right"><a href="#" title="Toggle the privacy setting"><i class="icon-<%= permission == 0 ? 'lock' : 'unlock' %> permission edit" data-id="<%= id %>"></i></a></li>
       </ul>
     <?php } else { ?>
@@ -100,7 +99,6 @@
       <div class="container">
         <div class="logo"></div>
         <a class="detail detail-link" href="">Detail View</a> <a href="#" class="detail close-link" title="Pressing ESC also closes this lightbox"><i class="icon-remove"></i></a>
-
       </div>
     </div>
     <div class="bd">
@@ -133,18 +131,15 @@
           <%- title || filenameOriginal %>
         <?php } ?>
       </span>
-      <span class="actions">
+      <span class="actions hidden-phone">
         <?php if($isAdmin) { ?>
-          <a href="#" class="tags edit" title="Edit Tags"><i class="icon-tags"></i><span class="hide"><%- tags %></span></a>
           <a href="#" class="share" data-id="<%= id %>" title="Share this photo via email, Facebook or Twitter"><i class="icon-share-alt"></i></a>
           <a href="<%= pathDownload %>" title="Download the original high resolution photo"><i class="icon-download"></i></a>
-          <a href="#" class="permission edit" title="Click to make this photo <%= permission == 0 ? 'public' : 'private' %>"><i class="icon-<%= permission == 0 ? 'lock' : 'unlock' %>"></i></a>
-          <a href="#" class="rotate" title="Click to rotate this photo"><i class="icon-rotate-right"></i></a>
         <?php } else { ?>
           <?php if($this->config->site->allowOriginalDownload == 1) { ?>
             <a href="<%= pathDownload %>" title="Download the original high resolution photo"><i class="icon-download"></i></a>
           <?php } ?>
-          <i class="icon-<%= permission == 0 ? 'lock' : 'unlock' %>"></i>
+          <!--<i class="icon-<%= permission == 0 ? 'lock' : 'unlock' %>"></i>-->
         <?php } ?>
       </span>
     </div>
@@ -192,7 +187,7 @@
   <div class="row">
     <div class="span9">
       <div class="photo">
-        <img src="<%= path870x870 %>" class="photo-img-<%= id %>" />
+        <img src="<%= path870x870 %>" class="photo-img-<%= id %> photo-large" />
         <!--<span class="mag photo-view-modal-click" data-id="<%= id %>"><i class="icon-search"></i></span>-->
       </div>
       <div class="description"></div>
@@ -292,15 +287,19 @@
 
 <script type="tmpl/underscore" id="photo-detail-meta-tmpl">
   <ul>
-    <?php if($isAdmin) { ?>
-      <li><a href="#" class="share trigger" data-id="<%= id %>"><i class="icon-share-alt"></i> Share</i></a></li>
-    <?php } ?>
     <li><a class="permission<?php if($isAdmin) { ?> edit<?php } ?>" href="#"><i class="icon-<%= permission == 0 ? 'lock' : 'unlock' %>"></i> <%= permission == 0 ? 'Private' : 'Public' %></i></a></li>
+    <?php if($isAdmin) { ?>
+      <li><a href="#" class="lightbox" data-id="<%= id %>"><i class="icon-zoom-in"></i> Lightbox View</i></a></li>
+    <?php } ?>
+    <?php if($isAdmin) { ?>
+      <li><a class="rotate" href="#"><i class="icon-rotate-right"></i> Rotate</a></li>
+    <?php } ?>
     <?php if($isAdmin || $this->config->site->allowOriginalDownload == 1) { ?>
       <li><a href="<%= pathDownload %>" class="download trigger"><i class="icon-download"></i> Download</i></a></li>
     <?php } ?>
     <?php if($isAdmin) { ?>
-      <li><a class="rotate" href="#"><i class="icon-rotate-right"></i> Rotate</a></li>
+      <li><a class="profile" href="#" data-id="<%= id %>"><i class="icon-user profile"></i> Profile Photo</a></li>
+      <li><a href="#" class="share trigger" data-id="<%= id %>"><i class="icon-share-alt"></i> Share</i></a></li>
     <?php } ?>
   </ul>
 </script>
