@@ -7,6 +7,12 @@
 
     // CLICK
     this.click = {};
+    this.click.addSpinner = function(ev) {
+      var $el = $(ev.target);
+      // remove existing icons if any
+      $el.find('i').remove();
+      $('<i class="icon-spinner icon-spin"></i>').prependTo($el);
+    };
     this.click.batchAlbumMode = function(ev) {
       var $el = $(ev.target), $form = $el.closest('form'), $albums = $('select.albums', $form);
       if($el.val() === 'add')
@@ -158,6 +164,7 @@
         // we allow overriding the batch queue by passing in an id
         if($el.attr('data-ids'))
           params.ids = $el.attr('data-ids');
+
         OP.Util.makeRequest('/photos/update.json', params, function(response) {
           var result = response.result;
           model.set('loading', false);
@@ -227,7 +234,7 @@
     };
     this.submit.batch = function(ev) {
       ev.preventDefault();
-      var $form = $(ev.target), url = '/photos/update.json', formParams = $form.serializeArray(), batch = OP.Batch, params = {ids: batch.ids().join(','), crumb: TBX.crumb()};
+      var $form = $(ev.target), url = '/photos/update.json', formParams = $form.serializeArray(), batch = OP.Batch, idsArr = batch.ids(), params = {ids: idsArr.join(','), crumb: TBX.crumb()};
       $('button', $form).prepend('<i class="icon-spinner icon-spin"></i> ');
       for(i in formParams) {
         if(formParams.hasOwnProperty(i)) {
@@ -244,9 +251,19 @@
               url = '/photos/delete.json';
             } else {
               TBX.notification.show("Check the appropriate checkboxes so we know you're serious.", 'flash', 'error');
-              $($('button i', $form)[0]).remove();
+              OP.Util.fire('callback:remove-spinners');
               return; // don't continue
             }
+          } else if(formParams[i].name === 'dateAdjust') {
+            var dateAdjustedValue = formParams[i].value;
+            for(var innerI=0; innerI<idsArr.length; innerI++) {
+              op.data.store.Photos.get(idsArr[innerI])
+              .set({dateTaken: dateAdjustedValue}, {silent: true})
+              .save();
+            }
+            OP.Util.fire('callback:remove-spinners');
+            // TODO gh-321 figure out how to handle errors
+            return; // don't continue
           }
 
           params[formParams[i].name] = formParams[i].value;
@@ -334,7 +351,7 @@
         uploader.start();
       } else {
         TBX.notification.show('Nothing to upload.', 'flash', 'error');
-        TBX.callbacks.removeSpinners();
+        OP.Util.fire('callback:remove-spinners');
       }
     };
 
