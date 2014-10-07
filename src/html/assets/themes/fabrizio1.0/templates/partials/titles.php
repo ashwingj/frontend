@@ -1,8 +1,15 @@
 <?php
   $user = new User;
   $utilityObj = new Utility;
+  $configObj = getConfig();
   $page = $this->plugin->getData('page');
-  $username = $utilityObj->safe($user->getNameFromEmail($this->config->user->email), false);
+
+  // since $this->config->user doesn't exist on first set up we have to check gh-1546
+  if(isset($this->config->user)) {
+    $username = $utilityObj->safe($user->getNameFromEmail($this->config->user->email), false);
+  } else {
+    $username = User::displayNameDefault;
+  }
   $title = '';
 ?>
 
