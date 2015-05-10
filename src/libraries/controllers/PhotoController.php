@@ -17,7 +17,7 @@ class PhotoController extends BaseController
     $this->photo = new Photo;
   }
 
-  
+
   /**
     * Create a new version of the photo with ID $id as specified by $width, $height and $options.
     *
@@ -143,7 +143,7 @@ class PhotoController extends BaseController
     if(!empty($_SERVER['QUERY_STRING']))
       parse_str($_SERVER['QUERY_STRING'], $getParams);
 
-    $additionalParams = array('returnSizes' => $returnSizes, 'sortBy' => 'dateUploaded,desc');
+    $additionalParams = array('returnSizes' => $returnSizes, 'sortBy' => 'dateTaken,asc'); // dateTaken,asc
     if($isAlbum || $isTags)
     {
       if(!isset($getParams['sortBy']))
